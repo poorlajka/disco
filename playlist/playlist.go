@@ -8,28 +8,28 @@ import (
 )
 
 type Track struct {
-	Title      string
-	FilePath   string
-	SpotifyURL string
-	downloaded bool
+	Title        string
+	FilePath     string
+	SpotifyURL   string
+	IsDownloaded bool
 }
 
 type PlayList struct {
-	Queue   []Track
+	Queue   []*Track
 	Playing bool
 }
 
-func (pl *PlayList) Enqueue(song Track) {
+func (pl *PlayList) Enqueue(song *Track) {
 	pl.Queue = append(pl.Queue, song)
 }
 
-func (pl *PlayList) Dequeue(i uint) Track {
+func (pl *PlayList) Dequeue(i uint) *Track {
 	track := pl.Queue[i]
 	if len(pl.Queue) == 1 {
-		pl.Queue = []Track{}
+		pl.Queue = []*Track{}
 		return track
 	}
-	ret := make([]Track, 0)
+	ret := make([]*Track, 0)
 	ret = append(ret, pl.Queue[:i]...)
 	new := append(ret, pl.Queue[i+1:]...)
 	pl.Queue = new
@@ -85,9 +85,10 @@ func RemoveFile(filePath string, name string) {
 
 func (pl *PlayList) Download() {
 	for _, track := range pl.Queue {
-		if !track.downloaded {
+		if !track.IsDownloaded {
+			os.Remove("./trackAudios/download_list.log")
 			SpotifyDownload(track.SpotifyURL, "./audios/"+track.FilePath)
-			track.downloaded = true
+			track.IsDownloaded = true
 			os.Remove("./trackAudios/" + track.FilePath)
 			os.Remove("./trackAudios/download_list.log")
 		}
