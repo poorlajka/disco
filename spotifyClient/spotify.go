@@ -2,6 +2,7 @@ package spotifyClient
 
 import (
 	"context"
+	"disco/config"
 	"fmt"
 	"os"
 
@@ -18,19 +19,19 @@ type SpotifyClient struct {
 var spotifyClient SpotifyClient
 
 func SetEnvVars() {
-	err := os.Setenv("SPOTIFY_ID", "b69148d285ce4b21a21be46f55b43ef8")
+	err := os.Setenv("SPOTIFY_ID", config.SpotifyClientID)
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = os.Setenv("SPOTIFY_SECRET", "4a3531a7337d4b50b4ddd466ecb7f27a")
+	err = os.Setenv("SPOTIFY_SECRET", config.SpotifyClientSecret)
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = os.Setenv("SPOTIPY_CLIENT_ID", "b69148d285ce4b21a21be46f55b43ef8")
+	err = os.Setenv("SPOTIPY_CLIENT_ID", config.SpotifyClientID)
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = os.Setenv("SPOTIPY_CLIENT_SECRET", "4a3531a7337d4b50b4ddd466ecb7f27a")
+	err = os.Setenv("SPOTIPY_CLIENT_SECRET", config.SpotifyClientSecret)
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -7,14 +7,18 @@ import (
 )
 
 var (
-	Token     string
-	BotPrefix string
-	config    *configStruct
+	Token               string
+	BotPrefix           string
+	config              *configStruct
+	SpotifyClientID     string
+	SpotifyClientSecret string
 )
 
 type configStruct struct {
-	Token     string `json:"Token"`
-	BotPrefix string `json:"BotPrefix"`
+	Token               string `json:"Token"`
+	BotPrefix           string `json:"BotPrefix"`
+	SpotifyClientID     string `json:"SpotifyClientID"`
+	SpotifyClientSecret string `json:"SpotifyClientSecret"`
 }
 
 func ReadConfig() error {
@@ -38,6 +42,8 @@ func ReadConfig() error {
 
 	Token = config.Token
 	BotPrefix = config.BotPrefix
+	SpotifyClientID = config.SpotifyClientID
+	SpotifyClientSecret = config.SpotifyClientSecret
 
 	return nil
 }
