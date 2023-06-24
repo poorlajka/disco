@@ -204,6 +204,8 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bo
 		}
 
 		// Send received PCM to the sendPCM channel
+		//TODO THIS IS FUCKING STUPID SHURELY YOU CAN DO IT WITH ONE CHANNEL
+		// ALSO FIGURE OUT WHY PROCESSES DON't LET GO OF THE FILES
 		select {
 		case send <- audiobuf:
 		case <-skip:

@@ -16,6 +16,7 @@ import (
 
 type BotState int
 
+// TODO WHY WOULD WE EVER DO SHIT LIKE THIS THIS SUCKS REWRITE LATER
 var skipChan chan string
 var pauseChan chan string
 var ResumeChan chan string
@@ -62,7 +63,8 @@ func help() {
 
 func shuffle() {
 	bot.playList.Shuffle()
-	list()
+	bot.sendMessage("> ## Playlist shuffled")
+	bot.playList.IsUpdated = false
 }
 
 func skip() {
@@ -99,7 +101,7 @@ func pause() {
 
 }
 
-// TODO THIS IS UGLY FUCKING FIX IT LATER SOMETIMES
+// TODO THIS IS SO FUCKING UGLY FUCKING FIX IT LATER SOMETIMES
 func play() {
 	if playerState == Paused {
 		bot.sendMessage(fmt.Sprintf("> ### Resumed playing: %s", bot.currentTrack.Title))

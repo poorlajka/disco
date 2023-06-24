@@ -15,8 +15,9 @@ type Track struct {
 }
 
 type PlayList struct {
-	Queue   []*Track
-	Playing bool
+	Queue     []*Track
+	Playing   bool
+	IsUpdated bool
 }
 
 func (pl *PlayList) Enqueue(song *Track) {
@@ -52,7 +53,7 @@ func (pl *PlayList) Shuffle() {
 }
 
 func SpotifyDownload(url string, fileName string) {
-	fmt.Println(url)
+	fmt.Println(fileName)
 	cmd := exec.Command("python", "./spotify-dl-master/spotify_dl/spotify_dl.py", "--url", url, "--output", "./trackAudios", "--name", fileName)
 	err := cmd.Run()
 
@@ -83,14 +84,22 @@ func RemoveFile(filePath string, name string) {
 	}
 }
 
+// TODO THIS IS SHIT NEEDS TO BE REDONE SO DOWNLOADS WORK PROPERLY
+// "I'm a never nester" -Simon Bjurek
 func (pl *PlayList) Download() {
-	for _, track := range pl.Queue {
-		if !track.IsDownloaded {
-			os.Remove("./trackAudios/download_list.log")
-			SpotifyDownload(track.SpotifyURL, "./audios/"+track.FilePath)
-			track.IsDownloaded = true
-			os.Remove("./trackAudios/" + track.FilePath)
-			os.Remove("./trackAudios/download_list.log")
+	for {
+		pl.IsUpdated = true
+		for _, track := range pl.Queue {
+			if !pl.IsUpdated {
+				break
+			}
+			if !track.IsDownloaded {
+				os.Remove("./trackAudios/download_list.log")
+				SpotifyDownload(track.SpotifyURL, "./audios/"+track.FilePath)
+				track.IsDownloaded = true
+				os.Remove("./trackAudios/" + track.FilePath)
+				os.Remove("./trackAudios/download_list.log")
+			}
 		}
 	}
 }
