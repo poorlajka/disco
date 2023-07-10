@@ -55,24 +55,26 @@ func Authenticate() {
 	spotifyClient.client, spotifyClient.ctx = client, ctx
 }
 
-func Search(query string, searchType spotify.SearchType) spotify.FullTrack {
-	result, err := spotifyClient.client.Search(spotifyClient.ctx, query, searchType)
+func SearchTrack(query string) spotify.FullTrack {
+	result, err := spotifyClient.client.Search(spotifyClient.ctx, query, spotify.SearchTypeTrack)
+	if err != nil {
+		fmt.Printf("couldn't search: %v", err)
+	}
+	return result.Tracks.Tracks[0]
+}
+
+func SearchAlbum(query string) spotify.FullAlbum {
+	result, err := spotifyClient.client.Search(spotifyClient.ctx, query, spotify.SearchTypeAlbum)
 	if err != nil {
 		fmt.Printf("couldn't search: %v", err)
 	}
 
-	//tracks := result.Tracks.Tracks
-
-	/*
-		for i := 0; i < 10; i++ {
-			fmt.Printf("%d %s by ***%s*** \n", i+1, tracks[i].SimpleTrack.Name, tracks[i].Artists[0].Name)
-		}
-	*/
-
-	return result.Tracks.Tracks[0]
-
-	//.SimpleTrack.ExternalURLs["spotify"]
-
+	albumID := result.Albums.Albums[0].ID
+	album, err := spotifyClient.client.GetAlbum(spotifyClient.ctx, albumID)
+	if err != nil {
+		fmt.Printf("couldn't search: %v", err)
+	}
+	return *album
 }
 
 func SearchPlaylist(id string) spotify.FullPlaylist {

@@ -5,7 +5,15 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"sync"
 )
+
+type PlayList struct {
+	Queue     []*Track
+	Playing   bool
+	IsUpdated bool
+	Mutex     sync.Mutex
+}
 
 type Track struct {
 	Title        string
@@ -14,17 +22,21 @@ type Track struct {
 	IsDownloaded bool
 }
 
-type PlayList struct {
-	Queue     []*Track
-	Playing   bool
-	IsUpdated bool
-}
-
 func (pl *PlayList) Enqueue(song *Track) {
+	pl.IsUpdated = false
+	/*
+		pl.Mutex.Lock()
+		defer pl.Mutex.Unlock()
+	*/
+
 	pl.Queue = append(pl.Queue, song)
 }
 
 func (pl *PlayList) Dequeue(i uint) *Track {
+	pl.IsUpdated = false
+	//pl.Mutex.Lock()
+	//defer pl.Mutex.Unlock()
+
 	track := pl.Queue[i]
 	if len(pl.Queue) == 1 {
 		pl.Queue = []*Track{}
@@ -38,7 +50,11 @@ func (pl *PlayList) Dequeue(i uint) *Track {
 }
 
 func (pl *PlayList) Shuffle() {
-	//Fisher--Yates
+	pl.IsUpdated = false
+	pl.Mutex.Lock()
+	defer pl.Mutex.Unlock()
+
+	//Fisher--Yates algorithm
 	var randArr []int
 	for i := 0; i < len(pl.Queue); i++ {
 		randArr = append(randArr, rand.Intn(len(pl.Queue)))
@@ -52,11 +68,27 @@ func (pl *PlayList) Shuffle() {
 	}
 }
 
+func (pl *PlayList) swap(index1 int, index2 int) {
+	pl.IsUpdated = false
+	pl.Mutex.Lock()
+	defer pl.Mutex.Unlock()
+
+	pl.Queue[index1] = pl.Queue[index2]
+}
+
 func SpotifyDownload(url string, fileName string) {
 	fmt.Println(fileName)
-	cmd := exec.Command("python", "./spotify-dl-master/spotify_dl/spotify_dl.py", "--url", url, "--output", "./trackAudios", "--name", fileName)
-	err := cmd.Run()
+	cmd := exec.Command(
+		"python",
+		"./spotify-dl-master/spotify_dl/spotify_dl.py",
+		"--url",
+		url,
+		"--output",
+		"./trackAudios",
+		"--name",
+		fileName)
 
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("Error downloading %v", err)
 	}
@@ -84,22 +116,35 @@ func RemoveFile(filePath string, name string) {
 	}
 }
 
-// TODO THIS IS SHIT NEEDS TO BE REDONE SO DOWNLOADS WORK PROPERLY
-// "I'm a never nester" -Simon Bjurek
-func (pl *PlayList) Download() {
+func (playlist *PlayList) StartDownloadThread() {
+	go playlist.Download()
+}
+
+func (playlist *PlayList) Download() {
 	for {
-		pl.IsUpdated = true
-		for _, track := range pl.Queue {
-			if !pl.IsUpdated {
-				break
-			}
-			if !track.IsDownloaded {
-				os.Remove("./trackAudios/download_list.log")
-				SpotifyDownload(track.SpotifyURL, "./audios/"+track.FilePath)
-				track.IsDownloaded = true
-				os.Remove("./trackAudios/" + track.FilePath)
-				os.Remove("./trackAudios/download_list.log")
-			}
+		playlist.DownloadTracks()
+	}
+}
+
+func (playlist *PlayList) DownloadTracks() {
+	playlist.Mutex.Lock()
+	defer playlist.Mutex.Unlock()
+
+	playlist.IsUpdated = true
+	for _, track := range playlist.Queue {
+		if !playlist.IsUpdated {
+			return
 		}
+		track.Download()
+	}
+}
+
+func (track *Track) Download() {
+	if !track.IsDownloaded {
+		os.Remove("./trackAudios/download_list.log")
+		SpotifyDownload(track.SpotifyURL, "./audios/"+track.FilePath)
+		track.IsDownloaded = true
+		os.Remove("./trackAudios/" + track.FilePath)
+		os.Remove("./trackAudios/download_list.log")
 	}
 }

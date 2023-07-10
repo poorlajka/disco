@@ -11,8 +11,17 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/zmb3/spotify"
 )
+
+/*
+TODOS:
+1. Downloads should start in a separate thread immediately on bot startup, adding tracks should get downloaded as the playlist gets updated.
+2. Add command to add albums.
+3. Make shure ffmpg get's killed properly on skip, also rewrite skip, pause, resume.
+4. Add command to move tracks in playlist
+5. Add commands to show history of played tracks
+6. Rewrite spotify-dl in pure go
+*/
 
 type BotState int
 
@@ -44,6 +53,7 @@ type Bot struct {
 	currentTrack   *playlist.Track
 	voiceChannelID string
 	ServerID       string
+	DiscordServers map[string]config.DiscordServer
 }
 
 var playerState PlayerState
@@ -62,9 +72,8 @@ func help() {
 }
 
 func shuffle() {
+	bot.sendMessage("> ## Shuffling playlist")
 	bot.playList.Shuffle()
-	bot.sendMessage("> ## Playlist shuffled")
-	bot.playList.IsUpdated = false
 }
 
 func skip() {
@@ -115,16 +124,11 @@ func play() {
 		return
 	}
 	playerState = Playing
-	go bot.playList.Download()
+
 	voiceConnection, err := bot.session.ChannelVoiceJoin(bot.ServerID, bot.voiceChannelID, false, true)
 	if err != nil {
+		fmt.Printf("something here")
 		return
-	}
-
-	wait := 0
-	for i := 0; i < wait; i++ {
-		bot.sendMessage(fmt.Sprintf("> ### Beginning %d seconds!", wait-i))
-		time.Sleep(1 * time.Second)
 	}
 
 	for {
@@ -144,21 +148,20 @@ func play() {
 		track := bot.playList.Dequeue(0)
 		if !track.IsDownloaded {
 
-			bot.sendMessage("> ### Preparing playlist download")
+			bot.sendMessage("> ### Loading")
 			i := 1
 			for !track.IsDownloaded {
 				time.Sleep(1000 * time.Millisecond)
 				bot.sendMessage("> ### " + strings.Repeat(".", i*10))
 				i++
 			}
-			bot.sendMessage("> ### Ready to play now :)")
+			//bot.sendMessage("> ### Ready to play now :)")
+			bot.sendMessage(fmt.Sprintf("> ### Currently playing: %s :musical_note:", track.Title))
 		}
 		bot.session.UpdateListeningStatus(strings.Split(track.Title, " by ")[1])
 
 		bot.currentTrack = track
 		path := "./trackAudios/audios/" + track.FilePath + ".mp3"
-
-		bot.sendMessage(fmt.Sprintf("> ### Currently playing: %s", track.Title))
 
 		skipChan = make(chan string)
 		pauseChan = make(chan string)
@@ -203,7 +206,6 @@ func remove(argv []string) {
 	bot.sendMessage(fmt.Sprintf("> ### Removed ***%s*** from queue!", song.Title))
 }
 
-// TODO THIS IS ABIT DIRTY COMBINE WITH ADD MBY SOMEHOW
 func addPlaylist(argv []string) {
 	if len(argv) == 0 {
 		bot.sendMessage("> ### The add playlist command requeres a id")
@@ -216,24 +218,60 @@ func addPlaylist(argv []string) {
 		url := fullTrack.SimpleTrack.ExternalURLs["spotify"]
 		name := fullTrack.Name
 		artist := fullTrack.Artists[0].Name
-		song := playlist.Track{Title: fmt.Sprintf("%s by %s", name, artist), FilePath: name, SpotifyURL: url}
+
+		song := playlist.Track{
+			Title:      fmt.Sprintf("%s by %s", name, artist),
+			FilePath:   name,
+			SpotifyURL: url}
+
 		bot.playList.Enqueue(&song)
 	}
 	bot.sendMessage(fmt.Sprintf("> ### Added the playlist %s by user %s", playList.Name, playList.Owner.DisplayName))
 }
 
-func add(argv []string) {
+func addAlbum(argv []string) {
+	if len(argv) == 0 {
+		bot.sendMessage("> ### The add playlist command requeres a id")
+		return
+	}
+
+	query := strings.Join(argv, " ")
+	album := spotifyClient.SearchAlbum(query)
+
+	albumName := album.Name
+	albumArtist := album.Artists[0].Name
+
+	for _, track := range album.Tracks.Tracks {
+		url := track.ExternalURLs["spotify"]
+		name := track.Name
+
+		song := playlist.Track{
+			Title:      fmt.Sprintf("%s by %s", name, albumArtist),
+			FilePath:   name,
+			SpotifyURL: url}
+
+		bot.playList.Enqueue(&song)
+	}
+	bot.sendMessage(fmt.Sprintf("> ### Added the album %s by %s", albumName, albumArtist))
+}
+
+func addTrack(argv []string) {
 	if len(argv) == 0 {
 		bot.sendMessage("> ### The add command requeres a search term")
 		return
 	}
 
 	query := strings.Join(argv, " ")
-	track := spotifyClient.Search(query, spotify.SearchTypeTrack)
+	track := spotifyClient.SearchTrack(query)
+
 	url := track.SimpleTrack.ExternalURLs["spotify"]
 	name := track.Name
 	artist := track.Artists[0].Name
-	song := playlist.Track{Title: fmt.Sprintf("%s by %s", name, artist), FilePath: name, SpotifyURL: url}
+
+	song := playlist.Track{
+		Title:      fmt.Sprintf("%s by %s", name, artist),
+		FilePath:   name,
+		SpotifyURL: url}
 
 	bot.playList.Enqueue(&song)
 	bot.sendMessage(fmt.Sprintf("> ### Added ***%s*** by ***%s*** to the queue", name, artist))
@@ -247,7 +285,9 @@ func handleCommand(session *discordgo.Session, message *discordgo.MessageCreate)
 
 	switch command {
 	case "add":
-		add(argv)
+		addTrack(argv)
+	case "addalbum":
+		addAlbum(argv)
 	case "addplaylist":
 		addPlaylist(argv)
 	case "remove":
@@ -299,7 +339,6 @@ func Start() {
 		fmt.Println(err.Error())
 		return
 	}
-
 	playerState = Idle
 
 	user, err := goBot.User("@me")
@@ -317,16 +356,17 @@ func Start() {
 	}
 
 	bot = Bot{
-		state: ListeningForCommand,
-		id:    user.ID,
-		//channelID: "1119642033905205291",
-		//channelID:      "1122024458824192080",
-		channelID: "1122024458824192080",
-		//voiceChannelID: "776165418989518938",
-		voiceChannelID: "816247222261121045",
-		ServerID:       "750434166310568058",
-		session:        goBot,
-		playList:       playlist.PlayList{Queue: []*playlist.Track{}}}
+		state:          ListeningForCommand,
+		id:             user.ID,
+		channelID:      "1119642033905205291",
+		voiceChannelID: "1119642033905205292",
+		ServerID:       "1119642033422868530",
+		//channelID: "1122024458824192080",
+		//voiceChannelID: "816247222261121045",
+		//ServerID: "750434166310568058",
+		session:  goBot,
+		playList: playlist.PlayList{Queue: []*playlist.Track{}}}
+	bot.playList.StartDownloadThread()
 
 	fmt.Println("Bot is up and running!")
 	bot.session.UpdateGameStatus(1, "")
